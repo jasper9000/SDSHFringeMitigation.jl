@@ -4,7 +4,7 @@ include("LeCroyTRC.jl")
 
 @enum Backend cpu cuda
 
-function load_data(filename::String, backend::Backend=cpu, float_type::Type=nothing)
+function load_data(filename::String, backend::Backend=cpu, float_type::Type=Float64)
     metadata, trigtimes, data = read_trc_file(filename)
     # pretty_metadata(metadata)
     times, f_sampling = get_time_array(metadata)
@@ -26,7 +26,7 @@ function load_data(filename::String, backend::Backend=cpu, float_type::Type=noth
     times = convert(Array{T}, times)
 
     # convert to CUDA
-    if BACKEND == cuda
+    if backend == cuda
         data = adapt(CuArray{T}, data);
         times = adapt(CuArray{T}, times);
     end
