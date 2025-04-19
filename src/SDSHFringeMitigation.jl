@@ -23,5 +23,5 @@ module SDSHFringeMitigation
     include("plotting/lttb.jl")
     include("plotting/misc.jl")
 
-    println("SDSHFringeMitigation.jl loaded")
+    # println("SDSHFringeMitigation.jl loaded")
 end 

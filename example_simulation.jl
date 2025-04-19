@@ -16,41 +16,27 @@ macro bind(def, element)
     #! format: on
 end
 
+# ╔═╡ 8dd41f4c-ad49-42ca-b5d0-d7e2b5e7f741
+using Suppressor; println("Installing required packages. This may take a few minutes...")
+
 # ╔═╡ d09ffcda-1c5e-11f0-2a95-13c00027ecfa
 begin
-	# push!(LOAD_PATH, dirname(pwd()));
+	# use the local environment and force the correct downloads
 	import Pkg
-	Pkg.activate(".")
-	Pkg.resolve()
-end
-
-# ╔═╡ 788fdd18-cf33-40f5-8845-9a35bed9c34d
-using Revise
-
-
-# ╔═╡ 89282ccd-b3c4-4587-af1f-96b6582b820a
-using SDSHFringeMitigation; const SFM = SDSHFringeMitigation;
-
-# ╔═╡ 111f1904-5d2d-41ea-ad40-8a1b85dcf37b
-begin
+	@suppress Pkg.activate(".")
+	@suppress Pkg.resolve()
+	# include("src/SDSHFringeMitigation.jl");
+	@suppress import SDSHFringeMitigation; const SFM = SDSHFringeMitigation;
+	
+	# plotting
 	import Plots
 	Plots.default(dpi=300)
-	Plots.pythonplot()
-	palette = :Set1_6
-	# import PlotlyJS as pltjs
-	# Plots.plotlyjs()
-	# using Plots
-	# default(dpi=300)
-	# plotlyjs()
-	
-	# using PlutoPlotly
-	using LaTeXStrings, ColorSchemes, ProgressBars, PlutoUI, Suppressor
-	# import PlutoUIExtra
-	using PartialFunctions, Statistics, LinearAlgebra, DSP
-end
+	@suppress Plots.pythonplot()
 
-# ╔═╡ c27eafaf-cb46-4e90-9492-945221ebcca7
-include("src/SDSHFringeMitigation.jl");
+	# general use imports
+	using LaTeXStrings, ColorSchemes, PlutoUI
+	using PartialFunctions, Statistics, LinearAlgebra, DSP
+end;
 
 # ╔═╡ 0742953a-7f12-4a94-a42a-9433544bcfc1
 HTML("""
@@ -76,6 +62,9 @@ HTML("""
 	</script>
 </div>
 """)
+
+# ╔═╡ c27eafaf-cb46-4e90-9492-945221ebcca7
+# @suppress import SDSHFringeMitigation; const SFM = SDSHFringeMitigation;
 
 # ╔═╡ 5107465f-5c73-41dd-af15-df87dc0b3d76
 md"""
@@ -117,20 +106,67 @@ Estimator from which training samples are selected: $(@bind training_estimator S
 KRR Hyperparameter Gridsearch size: $(@bind n_krr_grid NumberField(5:5:50, default=15))
 """
 
-# ╔═╡ 369fa5fe-f2c1-4676-ab68-c3f6a8292656
+# ╔═╡ 487db32b-66d7-4951-8f7f-506c63f83481
 begin
+
 	f_sampling = f_sampling_MHz * 1e6
 	n_supersample = 3
 	f_sampling_super = f_sampling * n_supersample
 	L = 4_000_000 * n_supersample
 
 	f_beat = f_sampling / 4
+	f_bw = 2 * f_beat * 0.98
 	
 	# define delay
 	n_si = 1.5
 	c = 3e8
 	tau_d = l_delay_m * n_si / c
 	tau_samples = round(Int, tau_d * f_sampling_super)
+
+
+	
+	f_sampling_raw = f_sampling;
+	use_mP_for_train = training_estimator == "S_INV - P" ? true : false;
+
+	l_delay_est = l_delay_m; # m
+	tau_est = l_delay_est / (3e8/1.5);
+	ONLY_FIRST_N_PEAKS = 5000;
+	n_avg_param_est = 250;
+	train_mask_filter_func = (f, p) -> (f .> 0.5/tau_est) .& (f .< f_bw/2) ;
+	
+	# this function additionally masks out spourious peaks
+	# train_mask_filter_func = (f, p) -> (f .> 0.6e6) .& (f .< 3.0e7) .& (p .< (f.^(-2.0) .* 0.75e4))# for agilent laser (Parks ring)
+	
+	n_avg_krr_train = 150;
+	n_avg = 50;
+	T = Float64;
+end;
+
+# ╔═╡ 8da77ef1-ba12-4883-9f25-88fad120772a
+pn_parameters; beat_note_snr_dB; f_sampling; l_delay_m; min_snr_dB; krr_train_samples; n_krr_grid; md"""
+# Run everything?
+#### Click the checkmark to compute everything!
+#### ➡️ $(@bind run_all CheckBox(default=false)) ⬅️
+
+
+The checkmark resets if phase noise parameters are changed, to save on computation.
+"""
+
+# ╔═╡ 369fa5fe-f2c1-4676-ab68-c3f6a8292656
+begin
+	# f_sampling = f_sampling_MHz * 1e6
+	# n_supersample = 3
+	# f_sampling_super = f_sampling * n_supersample
+	# L = 4_000_000 * n_supersample
+
+	# f_beat = f_sampling / 4
+	# f_bw = 2 * f_beat * 0.98
+	
+	# # define delay
+	# n_si = 1.5
+	# c = 3e8
+	# tau_d = l_delay_m * n_si / c
+	# tau_samples = round(Int, tau_d * f_sampling_super)
 
 	gaussian_pdf = (f, f_center, width) -> exp.(-0.5 * ((f .- f_center) ./ width).^2) ./ (width * sqrt(2 * π))
 
@@ -146,9 +182,8 @@ end;
 
 # ╔═╡ a09fa9b8-8350-4951-a133-e50f7182db79
 begin
+	palette = :Set1_6
 	Plots.gr()
-	# ff, pp = SFM.welch(pn_custom, f_sampling_super, 10)
-	# pp .*= ff.^2
 	f_noise = 10.0.^ (1:0.01:7)
 	
 	p_pn = Plots.plot(xscale=:log10, yscale=:log10, palette=palette, leg=:bottomleft)
@@ -181,20 +216,9 @@ begin
 	# p1
 end
 
-# ╔═╡ 8da77ef1-ba12-4883-9f25-88fad120772a
-pn_parameters; beat_note_snr_dB; f_sampling; l_delay_m; md"""
-# Run everything?
-
-The checkmark resets if phase noise parameters are changed, to save on computation.
-
-GO! $(@bind run_all CheckBox(default=false))
-
-"""
-
 # ╔═╡ 2b4666d8-16cb-46d0-bd48-89450f3e70ba
 begin
-	if run_all
-		
+	if run_all	
 		pn_custom = SFM.generate_custom_noise(L, f_sampling_super, noise_func_pn);
 		
 		# calculate Δϕ
@@ -204,8 +228,6 @@ begin
 		pn_delayed = filtfilt(sos, pn_delayed_supersampled)[1:n_supersample:end]
 	
 		# generate measurement noise
-	
-	
 		var_mn = 3e-9
 		mn_noise_function = (f) -> var_mn * 2 / f_sampling
 		mn = SFM.generate_custom_noise(L, f_sampling, mn_noise_function);
@@ -217,7 +239,12 @@ begin
 		t = collect(1:length(pn_delayed)) ./ f_sampling
 		y = A_0 .* sin.(2π * f_beat * t .+ pn_delayed) .+ mn[1:length(pn_delayed)];
 	end
-end
+end;
+
+# ╔═╡ f38ee192-b872-40b2-90d4-b3eef9c2ce15
+md"""
+# Simulated Signal y(t) after detection
+"""
 
 # ╔═╡ 646204c0-4bde-4f69-bfa9-3c481e03fb76
 begin
@@ -235,60 +262,30 @@ begin
 	end
 end
 
-# ╔═╡ 465e237d-a655-4f7d-85db-63edda1efacb
-# DSP starts here
-
-
 # ╔═╡ d9bb7605-acde-4fb9-8a46-d94980be5e88
 begin
 	if run_all
-		f_bw = 2 * f_beat * 0.98
 		phase_raw = SFM.bandpass_and_phase_estimation(y, f_sampling, f_beat, f_bw);
 		phase, δ_freq = SFM.detrend_phase(phase_raw, f_sampling);
-	end
-end;
 
-# ╔═╡ 487db32b-66d7-4951-8f7f-506c63f83481
-begin
-	f_sampling_raw = f_sampling;
-	use_mP_for_train = training_estimator == "S_INV - P" ? true : false;
-
-	l_delay_est = l_delay_m; # m
-	tau_est = l_delay_est / (3e8/1.5);
-	ONLY_FIRST_N_PEAKS = 5000;
-	n_avg_param_est = 250;
-	train_mask_filter_func = (f, p) -> (f .> 0.5/tau_est) .& (f .< f_bw/2) ;
-	
-	# this function additionally masks out spourious peaks
-	# train_mask_filter_func = (f, p) -> (f .> 0.6e6) .& (f .< 3.0e7) .& (p .< (f.^(-2.0) .* 0.75e4))# for agilent laser (Parks ring)
-	
-	n_avg_krr_train = 150;
-	n_avg = 50;
-	T = Float64;
-end;
-
-# ╔═╡ 40368e5d-3b1c-4cb1-b683-2772973b4640
-# estimate exp parameters
-
-# ╔═╡ fab954c6-57fc-4057-a2cf-20acf188c053
-begin
-	if run_all	
 		ff_phase, pp_phase = SFM.welch(phase, f_sampling, n_avg)
-		init_exp_params = SFM.estimate_experimental_parameters(phase, f_sampling, f_bw, T(l_delay_est); n_psd_avg=n_avg_param_est, only_first_n_peaks=ONLY_FIRST_N_PEAKS);
+		init_exp_params = @suppress SFM.estimate_experimental_parameters(phase, f_sampling, f_bw, T(l_delay_est); n_psd_avg=n_avg_param_est, only_first_n_peaks=ONLY_FIRST_N_PEAKS);
 		
 		# optional: improve estimates using fringe fitting
 		exp_params = SFM.improve_experimental_parameters_fringe_fit(phase, f_sampling, init_exp_params; n_psd_avg=100, median_filter_width=25);
+
+		if use_mP_for_train
+			f_train, p_train, S_xx_inv_train, idx_train, mask_train, krr_f_range_ = SFM.get_train_samples_P(phase, f_sampling, exp_params, n_psd_avg=n_avg_krr_train, min_snr_dB=min_snr_dB, N_TRAIN_MAX=krr_train_samples);
+		else
+			f_train, p_train, S_xx_inv_train, idx_train, mask_train, krr_f_range_ = SFM.get_train_samples(phase, f_sampling, exp_params, n_psd_avg=n_avg_krr_train, min_snr_dB=min_snr_dB, N_TRAIN_MAX=krr_train_samples);
+		end
 	end
 end;
 
-# ╔═╡ f78e8896-beaa-437a-9dce-8a89bf364a48
-if run_all
-	if use_mP_for_train
-		f_train, p_train, S_xx_inv_train, idx_train, mask_train, krr_f_range_ = SFM.get_train_samples_P(phase, f_sampling, exp_params, n_psd_avg=n_avg_krr_train, min_snr_dB=min_snr_dB, N_TRAIN_MAX=krr_train_samples);
-	else
-		f_train, p_train, S_xx_inv_train, idx_train, mask_train, krr_f_range_ = SFM.get_train_samples(phase, f_sampling, exp_params, n_psd_avg=n_avg_krr_train, min_snr_dB=min_snr_dB, N_TRAIN_MAX=krr_train_samples);
-	end
-end;
+# ╔═╡ d70695fc-1c04-4473-8f48-176b4ee1a10a
+md"""
+## Conventional PN-PSD equalization methods
+"""
 
 # ╔═╡ db246e44-7544-40f5-8dae-fbbdc81b5d52
 begin	
@@ -326,31 +323,19 @@ begin
 	end
 end
 
-# ╔═╡ f5307a34-b25a-4f3a-9602-87d2f12f77cf
-
-
-# ╔═╡ 9d4021ad-1b4d-4330-a687-f1bd3d6f9575
-
-
-# ╔═╡ 5042b6d4-483b-4e17-ae3f-d1ee204f3ebd
-
-
 # ╔═╡ 99c2143f-5790-4f6c-9682-ef4698990002
 begin
 	if run_all
-		@warn "Using custom train sample filter"
+		# @warn "Using custom train sample filter"
 		f_mask_train = train_mask_filter_func(f_train, p_train)
 		f_train_masked = f_train[f_mask_train]
 		p_train_masked = p_train[f_mask_train]
 		
-		
-		# krr_f_range = krr_f_range_
 		krr_f_range = [
 			maximum([minimum(f_train_masked),krr_f_range_[1]]),
 			minimum([maximum(f_train_masked), krr_f_range_[2]])
 		]
-		println("KRR range: ", krr_f_range)
-		
+		# println("KRR range: ", krr_f_range)
 		
 		# mask away
 		# f_mask = (f .> 0) .& (f .< krr_f_range[2])
@@ -361,7 +346,7 @@ begin
 		S_freqs = ff_phase_masked
 		S_freqs_inv = ff_phase_masked
 	end
-end
+end;
 
 # ╔═╡ 15f6b77b-6eea-45de-bb5d-44aed57fa132
 begin
@@ -396,8 +381,7 @@ begin
 		min_idx = argmin(results)
 		lambda_opt = lambdas[min_idx[1]]
 		sigma_opt = sigmas[min_idx[2]]
-		println("Optimal lambda: ", lambda_opt, " Optimal sigma: ", sigma_opt)
-		
+		# println("Optimal lambda: ", lambda_opt, " Optimal sigma: ", sigma_opt)
 		
 		krr_obj = SFM.krr_train(kernel_func, f_train, p_train; lambda=lambda_opt, kernel_params=(sigma=sigma_opt,), xlog=xlog, ylog=ylog)
 		
@@ -419,7 +403,12 @@ begin
 		G_PSE_2 = H_w_2_inv_full ./ (1.0 .+ H_w_2_inv_full .* (1.0 ./ snr));
 		S_pse = pp_phase_masked .* G_PSE_2;
 	end
-end
+end;
+
+# ╔═╡ 3dea087f-f796-4bf9-8d7d-4410bb007194
+md"""
+## KRR Hyperparameter grid search using grouped cross-validation
+"""
 
 # ╔═╡ 19b982ce-28ee-48c5-b45e-c962d3fc89f7
 @suppress begin
@@ -432,6 +421,11 @@ end
 		Plots.ylims!(lambdas[1], lambdas[end])
 	end
 end
+
+# ╔═╡ b9564291-4cdb-456b-88db-4f70ec8f864f
+md"""
+## Data-driven PSE filter PN-PSE estimation
+"""
 
 # ╔═╡ 42e826fc-dcb0-4057-9208-68009a818408
 begin
@@ -487,11 +481,9 @@ end
 
 # ╔═╡ Cell order:
 # ╟─0742953a-7f12-4a94-a42a-9433544bcfc1
-# ╠═788fdd18-cf33-40f5-8845-9a35bed9c34d
+# ╠═8dd41f4c-ad49-42ca-b5d0-d7e2b5e7f741
 # ╠═d09ffcda-1c5e-11f0-2a95-13c00027ecfa
 # ╠═c27eafaf-cb46-4e90-9492-945221ebcca7
-# ╠═89282ccd-b3c4-4587-af1f-96b6582b820a
-# ╟─111f1904-5d2d-41ea-ad40-8a1b85dcf37b
 # ╟─5107465f-5c73-41dd-af15-df87dc0b3d76
 # ╟─df222550-e9ca-4bc0-bb01-67b6079c16ef
 # ╟─a09fa9b8-8350-4951-a133-e50f7182db79
@@ -500,17 +492,14 @@ end
 # ╟─487db32b-66d7-4951-8f7f-506c63f83481
 # ╟─369fa5fe-f2c1-4676-ab68-c3f6a8292656
 # ╟─2b4666d8-16cb-46d0-bd48-89450f3e70ba
+# ╟─f38ee192-b872-40b2-90d4-b3eef9c2ce15
 # ╟─646204c0-4bde-4f69-bfa9-3c481e03fb76
-# ╠═465e237d-a655-4f7d-85db-63edda1efacb
 # ╟─d9bb7605-acde-4fb9-8a46-d94980be5e88
-# ╠═40368e5d-3b1c-4cb1-b683-2772973b4640
-# ╟─fab954c6-57fc-4057-a2cf-20acf188c053
-# ╟─f78e8896-beaa-437a-9dce-8a89bf364a48
+# ╟─d70695fc-1c04-4473-8f48-176b4ee1a10a
 # ╟─db246e44-7544-40f5-8dae-fbbdc81b5d52
-# ╠═f5307a34-b25a-4f3a-9602-87d2f12f77cf
-# ╠═9d4021ad-1b4d-4330-a687-f1bd3d6f9575
-# ╠═5042b6d4-483b-4e17-ae3f-d1ee204f3ebd
 # ╟─99c2143f-5790-4f6c-9682-ef4698990002
 # ╟─15f6b77b-6eea-45de-bb5d-44aed57fa132
+# ╟─3dea087f-f796-4bf9-8d7d-4410bb007194
 # ╟─19b982ce-28ee-48c5-b45e-c962d3fc89f7
+# ╟─b9564291-4cdb-456b-88db-4f70ec8f864f
 # ╟─42e826fc-dcb0-4057-9208-68009a818408
