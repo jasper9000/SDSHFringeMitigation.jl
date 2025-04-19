@@ -2,10 +2,9 @@
 
 <!-- [![Build Status](https://github.com/jasper9000/SDSHFringeMitigation.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/jasper9000/SDSHFringeMitigation.jl/actions/workflows/CI.yml?query=branch%3Amain) -->
 
-The code and data acompanying the publication
+The code and data accompanying the publication
 
-Jasper Riebesehl, David C. Nak and Darko Zibar, "Interference Fringe Mitigation in Short-Delay Self-Heterodyne Laser Phase Noise Measurements"
-
+> J. Riebesehl, D. C. Nak and D. Zibar, "Interference Fringe Mitigation in Short-Delay Self-Heterodyne Laser Phase Noise Measurements" (2025)
 
 
 # Installation steps

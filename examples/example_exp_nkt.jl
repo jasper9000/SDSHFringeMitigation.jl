@@ -19,6 +19,7 @@ end
 # ╔═╡ d09ffcda-1c5e-11f0-2a95-13c00027ecfa
 # ╠═╡ show_logs = false
 begin
+	cd("..")
 	# use the local environment and force the correct downloads
 	import Pkg
 	Pkg.activate(".")
@@ -96,6 +97,8 @@ end
 # ╔═╡ 5c394cd1-c50f-4048-ac08-c6d0e90b1851
 md"""
 # KRR Parameters
+
+The default parameters are tuned to work well on this dataset.
 
 Kernel Function: $(@bind kernel_func Select([SFM.rbf!, SFM.matern12!, SFM.matern32!, SFM.matern52!, SFM.matern72!, SFM.matern92!]))
 
@@ -312,25 +315,25 @@ md"""
 begin
 	if run_all
 		Plots.gr()
-		p4 = Plots.plot(yscale=:log10, xlabel="Frequency / MHz", ylabel=L"PN-PSD / $rad^2\;Hz^{-1}$", palette = palette, leg=:topright)
+		p5 = Plots.plot(yscale=:log10, xlabel="Frequency / MHz", ylabel=L"PN-PSD / $rad^2\;Hz^{-1}$", palette = palette, leg=:topright)
 		
-		Plots.plot!(p4, SFM.ds(Array(exp_params.f_psd)[2:end] .* 1e-6, exp_params.p_psd[2:end]),
+		Plots.plot!(p5, SFM.ds(Array(exp_params.f_psd)[2:end] .* 1e-6, exp_params.p_psd[2:end]),
 				   label=L"S_{\Delta\phi}(f)")
-		Plots.plot!(p4, SFM.ds(
+		Plots.plot!(p5, SFM.ds(
 		# 	S_freqs,
 			ff_phase .* 1e-6,
 			SFM.calc_S_inv(ff_phase, pp_phase, exp_params)
 		), label=L"$S_{\phi, INV} (f)$")
 		
-		Plots.plot!(p4, SFM.ds(ff_phase_masked.* 1e-6, S_pse)...,
+		Plots.plot!(p5, SFM.ds(ff_phase_masked.* 1e-6, S_pse)...,
 					label=L"$S_{\phi, PSE} (f)$")
 	
 		# training samples
 		n_sd_train_samples = 5
-		Plots.scatter!(p4, f_train_masked[1:n_sd_train_samples:end] .* 1e-6, p_train_masked[1:n_sd_train_samples:end], label="Training Samples", alpha=0.4)
+		Plots.scatter!(p5, f_train_masked[1:n_sd_train_samples:end] .* 1e-6, p_train_masked[1:n_sd_train_samples:end], label="Training Samples", alpha=0.4)
 		
 		# S KRR
-		Plots.plot!(p4, SFM.ds(ff_phase_masked[mask_krr_range] .*1e-6, S_krr)...,
+		Plots.plot!(p5, SFM.ds(ff_phase_masked[mask_krr_range] .*1e-6, S_krr)...,
 				   label=L"$S_{\phi, KRR} (f)$", linewidth=3)
 		
 			# segments
@@ -343,14 +346,55 @@ begin
 		    f_lower = ff_train[seg[1]]*1e-6
 		    f_upper = ff_train[seg[2]]*1e-6
 		    # println("Segment: ", f_lower, " - ", f_upper)
-		    Plots.vspan!(p4, [f_lower, f_upper],
+		    Plots.vspan!(p5, [f_lower, f_upper],
 						 color=:grey, alpha=0.3,
 						 label="")
 		end
 		
+		Plots.hline!(p5, [exp_params.S_eta.val], label=L"$S_\epsilon$", linewidth=2, color=:black, linestyle=:dash)
+		Plots.xlims!(p5, 0, f_bw/2 * 1e-6)
+		Plots.ylims!(p5, exp_params.S_eta.val/10, 1e-5)
+		p5
+	end
+end
+
+# ╔═╡ 592e6d76-a3d5-4125-b85e-f0936f2a3629
+begin
+	if run_all
+		Plots.gr()
+		p4 = Plots.plot(xlabel="Frequency / Hz", ylabel=L"PN-PSD / $rad^2\;Hz^{-1}$", palette = palette, leg=:topright, xscale=:log10, yscale=:log10)
+		
+		Plots.plot!(p4, SFM.ds(Array(exp_params.f_psd)[2:end], exp_params.p_psd[2:end]),
+				   label=L"S_{\Delta\phi}(f)")
+		Plots.plot!(p4, SFM.ds(
+		# 	S_freqs,
+			ff_phase[2:end],
+			SFM.calc_S_inv(ff_phase, pp_phase, exp_params)[2:end]
+		), label=L"$S_{\phi, INV} (f)$")
+		
+		Plots.plot!(p4, SFM.ds(ff_phase_masked[2:end], S_pse[2:end])...,
+					label=L"$S_{\phi, PSE} (f)$")
+	
+		# # training samples
+		# Plots.scatter!(p4, f_train_masked[1:n_sd_train_samples:end], p_train_masked[1:n_sd_train_samples:end], label="Training Samples", alpha=0.4)
+		
+		# S KRR
+		Plots.plot!(p4, SFM.ds(ff_phase_masked[mask_krr_range][2:end], S_krr[2:end])...,
+				   label=L"$S_{\phi, KRR} (f)$", linewidth=3)
+		
+		# for seg in SFM.find_continuous_segments(.!BitVector(mask_train))[2:end]
+		#     f_lower = ff_train[seg[1]]
+		#     f_upper = ff_train[seg[2]]
+		#     # println("Segment: ", f_lower, " - ", f_upper)
+		#     Plots.vspan!(p4, [f_lower, f_upper],
+		# 				 color=:grey, alpha=0.3,
+		# 				 label="")
+		# end
+		
 		Plots.hline!(p4, [exp_params.S_eta.val], label=L"$S_\epsilon$", linewidth=2, color=:black, linestyle=:dash)
-		Plots.xlims!(p4, 0, f_bw/2 * 1e-6)
-		Plots.ylims!(p4, exp_params.S_eta.val/10, 1e-5)
+		Plots.xlims!(p4, ff_phase[2], f_bw/2)
+		Plots.ylims!(p4, exp_params.S_eta.val/10, maximum(S_pse))
+		p4
 	end
 end
 
@@ -372,3 +416,4 @@ end
 # ╟─19b982ce-28ee-48c5-b45e-c962d3fc89f7
 # ╟─b9564291-4cdb-456b-88db-4f70ec8f864f
 # ╟─42e826fc-dcb0-4057-9208-68009a818408
+# ╟─592e6d76-a3d5-4125-b85e-f0936f2a3629

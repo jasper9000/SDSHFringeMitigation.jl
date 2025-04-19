@@ -20,6 +20,7 @@ end
 # ╠═╡ show_logs = false
 begin
 	# use the local environment and force the correct downloads
+	cd("..")
 	import Pkg
 	Pkg.activate(".")
 	Pkg.resolve()
@@ -67,33 +68,50 @@ println("Installing required packages. This may take a few minutes...")
 
 # ╔═╡ 5107465f-5c73-41dd-af15-df87dc0b3d76
 md"""
-# Simulation Signal Parameters
+# Load experimental data:
+**Custom external cavity DFB laser**
 
-f\_sampling: $(@bind f_sampling_MHz NumberField(10:10:1000, default=20)) MHz
+Measured with a optical delay path of approx.  530 m
 
-Optical Delay Path: $(@bind l_delay_m NumberField(100:10:5_000, default=500)) m
+Choose the file: $(@bind whichfile Select(["ECDFB_10MHz.trc", "ECDFB_3MHz.trc"]))
 """
 
-# ╔═╡ df222550-e9ca-4bc0-bb01-67b6079c16ef
-@bind pn_parameters PlutoUI.combine() do child
-	md"""
-	# Phase Noise Shape Parameters
-	- Beat Note SNR: $(@bind beat_note_snr_dB Slider(0:1:50, default=30, show_value=true)) dB
-	- Lorentzian Linewidth: $(child(Slider(1:0.1:5; default=2.2, show_value=true)))
-	- 1/f Noise Scale: $(child(Slider(1:0.1:15; default=7.7, show_value=true)))
-	- Gaussian Bump Amplitude: $(child(Slider(3:0.1:15; default=10.0, show_value=true)))
-	- Gaussian Bump Center Frequency: $(child(Slider(3:0.1:7; default=6.0, show_value=true)))
-	- Gaussian Bump Width: $(child(Slider(2:0.1:7; default=5.5, show_value=true)))
-	"""
+# ╔═╡ e2bed533-d289-44da-b9bb-f44cc2fde683
+begin
+	if whichfile == "ECDFB_10MHz.trc"
+		f_beat = 10e6 # location of the beat note
+		ONLY_FIRST_N_PEAKS = 20;
+	elseif whichfile == "ECDFB_3MHz.trc"
+		f_beat = 3e6 # location of the beat note
+		ONLY_FIRST_N_PEAKS = 5;
+	end
+	
+	f_bw = 0.96 * 2 * f_beat # filter bandwidth of bandpass filter around beat note
+	l_delay_est = 530.0
+	
+	file = "exp_data/$(whichfile)"
+	
+	# load file
+	t, y, f_sampling, T = SFM.load_data(file)
+	
+	# # # show the signal
+	f_signal, p_signal = SFM.welch(y, f_sampling, 15)
+	p1 = Plots.plot(SFM.ds(f_signal, p_signal),
+			   yscale=:log10, xlabel="Frequency / Hz",
+			   ylabel="PSD / (a.u.)", title="Measured Signal PSD",
+			   legend=false)
+	p1
 end
 
 # ╔═╡ 5c394cd1-c50f-4048-ac08-c6d0e90b1851
 md"""
 # KRR Parameters
 
+The default parameters are tuned to work well for this dataset.
+
 Kernel Function: $(@bind kernel_func Select([SFM.rbf!, SFM.matern12!, SFM.matern32!, SFM.matern52!, SFM.matern72!, SFM.matern92!]))
 
-SNR Threshold: $(@bind min_snr_dB NumberField(1.0:1.0:30.0, default=3)) dB
+SNR Threshold: $(@bind min_snr_dB NumberField(1.0:1.0:30.0, default=1)) dB
 
 N training samples: $(@bind krr_train_samples NumberField(300:100:1000, default=600))
 
@@ -102,47 +120,11 @@ KRR y-axis log scaling: $(@bind ylog CheckBox(default=true))
 
 Estimator from which training samples are selected: $(@bind training_estimator Select(["S_INV - P", "S_INV"]))
 
-KRR Hyperparameter Gridsearch size: $(@bind n_krr_grid NumberField(5:5:50, default=15))
+KRR Hyperparameter Gridsearch size: $(@bind n_krr_grid NumberField(5:5:50, default=20))
 """
 
-# ╔═╡ 487db32b-66d7-4951-8f7f-506c63f83481
-begin
-
-	f_sampling = f_sampling_MHz * 1e6
-	n_supersample = 3
-	f_sampling_super = f_sampling * n_supersample
-	L = 4_000_000 * n_supersample
-
-	f_beat = f_sampling / 4
-	f_bw = 2 * f_beat * 0.98
-	
-	# define delay
-	n_si = 1.5
-	c = 3e8
-	tau_d = l_delay_m * n_si / c
-	tau_samples = round(Int, tau_d * f_sampling_super)
-
-
-	
-	f_sampling_raw = f_sampling;
-	use_mP_for_train = training_estimator == "S_INV - P" ? true : false;
-
-	l_delay_est = l_delay_m; # m
-	tau_est = l_delay_est / (3e8/1.5);
-	ONLY_FIRST_N_PEAKS = 5000;
-	n_avg_param_est = 250;
-	train_mask_filter_func = (f, p) -> (f .> 0.5/tau_est) .& (f .< f_bw/2) ;
-	
-	# this function additionally masks out spourious peaks
-	# train_mask_filter_func = (f, p) -> (f .> 0.6e6) .& (f .< 3.0e7) .& (p .< (f.^(-2.0) .* 0.75e4))# for agilent laser (Parks ring)
-	
-	n_avg_krr_train = 150;
-	n_avg = 50;
-	T = Float64;
-end;
-
 # ╔═╡ 8da77ef1-ba12-4883-9f25-88fad120772a
-pn_parameters; beat_note_snr_dB; f_sampling; l_delay_m; min_snr_dB; krr_train_samples; n_krr_grid; md"""
+min_snr_dB; krr_train_samples; n_krr_grid; md"""
 # Run everything?
 #### Click the checkmark to compute everything!
 #### ➡️ $(@bind run_all CheckBox(default=false)) ⬅️
@@ -151,115 +133,27 @@ pn_parameters; beat_note_snr_dB; f_sampling; l_delay_m; min_snr_dB; krr_train_sa
 The checkmark resets if phase noise parameters are changed, to save on computation.
 """
 
-# ╔═╡ 369fa5fe-f2c1-4676-ab68-c3f6a8292656
+# ╔═╡ 487db32b-66d7-4951-8f7f-506c63f83481
 begin
-	# f_sampling = f_sampling_MHz * 1e6
-	# n_supersample = 3
-	# f_sampling_super = f_sampling * n_supersample
-	# L = 4_000_000 * n_supersample
+	n_si = 1.5
+	c = 3e8
 
-	# f_beat = f_sampling / 4
-	# f_bw = 2 * f_beat * 0.98
+	use_mP_for_train = training_estimator == "S_INV - P" ? true : false;
+
+	# l_delay_est = l_delay_m; # m
+	tau_est = l_delay_est / (3e8/1.5);
+	n_avg_param_est = 250;
+	# train_mask_filter_func = (f, p) -> (f .> 0.5/tau_est) .& (f .< f_bw/2) ;
+	train_mask_filter_func = (f, p) -> (f .> 0.5/tau_est) .& (f .< 8e6) ;
 	
-	# # define delay
-	# n_si = 1.5
-	# c = 3e8
-	# tau_d = l_delay_m * n_si / c
-	# tau_samples = round(Int, tau_d * f_sampling_super)
-
-	gaussian_pdf = (f, f_center, width) -> exp.(-0.5 * ((f .- f_center) ./ width).^2) ./ (width * sqrt(2 * π))
-
-	noise_func_lorentz = (f) -> 10.0.^pn_parameters[1]./π
-	noise_func_flicker = (f) -> 10.0.^pn_parameters[2] .* f.^(-1)
-	noise_bump = (f) -> 10.0.^pn_parameters[3] .* gaussian_pdf(f, 10.0.^pn_parameters[4], 10.0.^pn_parameters[5])
+	# this function additionally masks out spourious peaks
+	# train_mask_filter_func = (f, p) -> (f .> 0.6e6) .& (f .< 3.0e7) .& (p .< (f.^(-2.0) .* 0.75e4))# for agilent laser (Parks ring)
 	
-	noise_func_fn = (f) -> noise_func_flicker(f) .+ noise_bump(f) .+ noise_func_lorentz(f)
-	
-	noise_func_pn = (f) -> noise_func_fn(f) ./ f.^2
+	n_avg_krr_train = 150;
+	n_avg = 50;
 
+	palette=:Set1_6
 end;
-
-# ╔═╡ a09fa9b8-8350-4951-a133-e50f7182db79
-begin
-	palette = :Set1_6
-	Plots.gr()
-	f_noise = 10.0.^ (1:0.01:7)
-	
-	p_pn = Plots.plot(xscale=:log10, yscale=:log10, palette=palette, leg=:bottomleft)
-	Plots.plot!(p_pn, f_noise, noise_func_lorentz(f_noise) ./ f_noise.^2, label="Lorentz", linewidth=2.5, linestyle=:dash)
-	Plots.plot!(p_pn, f_noise, noise_func_flicker(f_noise) ./ f_noise.^2, label="1/f Noise", linewidth=2.5, linestyle=:dash)
-	Plots.plot!(p_pn, f_noise, noise_bump(f_noise) ./ f_noise.^2, label="Bump", linewidth=2.5, linestyle=:dash)
-	Plots.plot!(p_pn, SFM.ds(f_noise, noise_func_pn(f_noise), xlog=true), label="Total", linewidth=2.5, ylabel=L"PN-PSD / $rad^2 Hz^{-1}$")
-	Plots.hline!(p_pn, [2/(f_sampling * 10.0^(beat_note_snr_dB/10))], linewidth=2, label="Measurement Noise Floor")
-	Plots.ylims!(p_pn, 1e-20, 1e5)
-
-	
-	p_fn = Plots.plot(xscale=:log10, yscale=:log10, label="True FN-PSD", palette=palette, xlabel="Frequency / Hz", ylabel=L"FN-PSD / $Hz^2 Hz^{-1}$",
-					 leg=:bottomleft)
-	Plots.plot!(p_fn, f_noise, noise_func_lorentz(f_noise) ./ f_noise.^0, label="Lorentz", linewidth=2.5, linestyle=:dash)
-	Plots.plot!(p_fn, f_noise, noise_func_flicker(f_noise), label="1/f Noise", linewidth=2.5, linestyle=:dash)
-	Plots.plot!(p_fn, f_noise, noise_bump(f_noise), label="Bump", linewidth=2.5, linestyle=:dash)
-	Plots.plot!(p_fn, SFM.ds(f_noise, noise_func_fn(f_noise), xlog=true), label="Total", linewidth=2.5)
-	Plots.plot!(p_fn, f_noise, f_noise.^2 .* 2/(f_sampling * 10.0^(beat_note_snr_dB/10)), linewidth=2, label="Measurement Noise Floor")
-	# Plots.ylims!(1, minimum([minimum(noise_func_fn(f_noise)), 1e10]))
-	Plots.ylims!(1, 1e6)
-	
-	Plots.plot(p_pn, p_fn, layout=(2,1), sharex=true)
-
-	
-	# Plots.plot!(p1, xlabel="Frequency / Hz", ylabel=L"PN-PSD / $rad^2\;Hz^{-1}$",
-	# 			xticks=[10^i for i in 1:7],
-	# 		    yticks=[10.0^i for i in -14:2:0],
-	# 		   title="Simulated Phase Noise")
-	# PlutoPlot(p1)
-	# p1
-end
-
-# ╔═╡ 2b4666d8-16cb-46d0-bd48-89450f3e70ba
-begin
-	if run_all	
-		pn_custom = SFM.generate_custom_noise(L, f_sampling_super, noise_func_pn);
-		
-		# calculate Δϕ
-		pn_delayed_supersampled = pn_custom[1:end-tau_samples] .- pn_custom[tau_samples+1:end]
-		# downsample
-		sos = digitalfilter(Lowpass((f_sampling/f_sampling_super)/2), Butterworth(8))
-		pn_delayed = filtfilt(sos, pn_delayed_supersampled)[1:n_supersample:end]
-	
-		# generate measurement noise
-		var_mn = 3e-9
-		mn_noise_function = (f) -> var_mn * 2 / f_sampling
-		mn = SFM.generate_custom_noise(L, f_sampling, mn_noise_function);
-	
-		# define signal parameters
-		beat_note_snr_lin = 10.0 ^ (beat_note_snr_dB/10.0)
-		A_0 = sqrt(2 * var_mn * beat_note_snr_lin)
-		
-		t = collect(1:length(pn_delayed)) ./ f_sampling
-		y = A_0 .* sin.(2π * f_beat * t .+ pn_delayed) .+ mn[1:length(pn_delayed)];
-	end
-end;
-
-# ╔═╡ f38ee192-b872-40b2-90d4-b3eef9c2ce15
-md"""
-# Simulated Signal y(t) after detection
-"""
-
-# ╔═╡ 646204c0-4bde-4f69-bfa9-3c481e03fb76
-begin
-	if run_all
-		# calculate and plot spectrum
-		ff_y, pp_y = SFM.welch(y, f_sampling, 10)
-		p2 = Plots.plot(palette=palette)
-		Plots.plot!(p2, SFM.ds((ff_y .- f_beat) .* 1e-6, SFM.nonneg(abs.(pp_y))), yscale=:log10, label=L"PSD of Signal $y(t_k)$")
-		Plots.hline!(p2, [mn_noise_function(0)], label="Measurement Noise Floor", linewidth=2.5, linestyle=:dash)
-		Plots.plot!(p2, xlabel="Frequency / MHz",
-					ylabel="Signal PSD / (a.u.)",
-				   # xticks=((-3:3),[L"f_{\mathrm{AOFS}} %$(i < 0 ? '-' : '+') %$(abs(i))" for i in (-3:3)])
-					)
-		p2
-	end
-end
 
 # ╔═╡ d9bb7605-acde-4fb9-8a46-d94980be5e88
 begin
@@ -311,10 +205,6 @@ begin
 		Plots.scatter!(p3, exp_params.fringes.f .* 1e-6, exp_params.fringes.p, label="Detected Peaks")	
 		
 		Plots.hline!(p3, [exp_params.S_eta.val], label=L"Estimated Noise Floor $S_\epsilon$", linewidth=2, color=:black, linestyle=:dash)
-
-		# Plots.hline!(p3, [2/(f_sampling * beat_note_snr_lin)], label="true Noise floor")
-		
-		Plots.plot!(p3, SFM.ds(Array(exp_params.f_psd .* 1e-6)[2:end], noise_func_pn(exp_params.f_psd[2:end])), label=L"True PN $S_{\phi, \mathrm{true}}(f)$", linewidth=2)
 		
 		Plots.xlims!(p3, 0, f_bw/2 * 1e-6)
 		Plots.ylims!(p3, exp_params.S_eta.val/10, 1e-5)
@@ -431,32 +321,26 @@ md"""
 begin
 	if run_all
 		Plots.gr()
-		p4 = Plots.plot(yscale=:log10, xlabel="Frequency / MHz", ylabel=L"PN-PSD / $rad^2\;Hz^{-1}$", palette = palette, leg=:topright)
+		p5 = Plots.plot(yscale=:log10, xlabel="Frequency / MHz", ylabel=L"PN-PSD / $rad^2\;Hz^{-1}$", palette = palette, leg=:topright)
 		
-		Plots.plot!(p4, SFM.ds(Array(exp_params.f_psd)[2:end] .* 1e-6, exp_params.p_psd[2:end]),
+		Plots.plot!(p5, SFM.ds(Array(exp_params.f_psd)[2:end] .* 1e-6, exp_params.p_psd[2:end]),
 				   label=L"S_{\Delta\phi}(f)")
-		Plots.plot!(p4, SFM.ds(
+		Plots.plot!(p5, SFM.ds(
 		# 	S_freqs,
 			ff_phase .* 1e-6,
 			SFM.calc_S_inv(ff_phase, pp_phase, exp_params)
 		), label=L"$S_{\phi, INV} (f)$")
 		
-		Plots.plot!(p4, SFM.ds(ff_phase_masked.* 1e-6, S_pse)...,
+		Plots.plot!(p5, SFM.ds(ff_phase_masked.* 1e-6, S_pse)...,
 					label=L"$S_{\phi, PSE} (f)$")
 	
 		# training samples
-		n_sd_train_samples = 1
-		Plots.scatter!(p4, f_train_masked[1:n_sd_train_samples:end] .* 1e-6, p_train_masked[1:n_sd_train_samples:end], label="Training Samples", alpha=0.4)
+		n_sd_train_samples = 5
+		Plots.scatter!(p5, f_train_masked[1:n_sd_train_samples:end] .* 1e-6, p_train_masked[1:n_sd_train_samples:end], label="Training Samples", alpha=0.4)
 		
 		# S KRR
-		Plots.plot!(p4, SFM.ds(ff_phase_masked[mask_krr_range] .*1e-6, S_krr)...,
+		Plots.plot!(p5, SFM.ds(ff_phase_masked[mask_krr_range] .*1e-6, S_krr)...,
 				   label=L"$S_{\phi, KRR} (f)$", linewidth=3)
-	
-		# S true
-		Plots.plot!(p4, SFM.ds(Array(exp_params.f_psd .* 1e-6)[2:end], noise_func_pn(exp_params.f_psd[2:end])), label=L"True PN $S_{\phi, \mathrm{true}}(f)$", linewidth=2, linestyle=:dash)
-	
-	
-	
 		
 			# segments
 		# this is just to get the right freequencies, a bit hacky
@@ -468,14 +352,55 @@ begin
 		    f_lower = ff_train[seg[1]]*1e-6
 		    f_upper = ff_train[seg[2]]*1e-6
 		    # println("Segment: ", f_lower, " - ", f_upper)
-		    Plots.vspan!(p4, [f_lower, f_upper],
+		    Plots.vspan!(p5, [f_lower, f_upper],
 						 color=:grey, alpha=0.3,
 						 label="")
 		end
 		
+		Plots.hline!(p5, [exp_params.S_eta.val], label=L"$S_\epsilon$", linewidth=2, color=:black, linestyle=:dash)
+		Plots.xlims!(p5, 0, f_bw/2 * 1e-6)
+		Plots.ylims!(p5, exp_params.S_eta.val/10, 1e-5)
+		p5
+	end
+end
+
+# ╔═╡ 0d9e7ab1-fdee-4293-90b4-a8bff74f48be
+begin
+	if run_all
+		Plots.gr()
+		p4 = Plots.plot(xlabel="Frequency / Hz", ylabel=L"PN-PSD / $rad^2\;Hz^{-1}$", palette = palette, leg=:topright, xscale=:log10, yscale=:log10)
+		
+		Plots.plot!(p4, SFM.ds(Array(exp_params.f_psd)[2:end], exp_params.p_psd[2:end]),
+				   label=L"S_{\Delta\phi}(f)")
+		Plots.plot!(p4, SFM.ds(
+		# 	S_freqs,
+			ff_phase[2:end],
+			SFM.calc_S_inv(ff_phase, pp_phase, exp_params)[2:end]
+		), label=L"$S_{\phi, INV} (f)$")
+		
+		Plots.plot!(p4, SFM.ds(ff_phase_masked[2:end], S_pse[2:end])...,
+					label=L"$S_{\phi, PSE} (f)$")
+	
+		# training samples
+		# Plots.scatter!(p4, f_train_masked[1:n_sd_train_samples:end], p_train_masked[1:n_sd_train_samples:end], label="Training Samples", alpha=0.4)
+		
+		# S KRR
+		Plots.plot!(p4, SFM.ds(ff_phase_masked[mask_krr_range][2:end], S_krr[2:end])...,
+				   label=L"$S_{\phi, KRR} (f)$", linewidth=3)
+		
+		# for seg in SFM.find_continuous_segments(.!BitVector(mask_train))[2:end]
+		#     f_lower = ff_train[seg[1]]
+		#     f_upper = ff_train[seg[2]]
+		#     # println("Segment: ", f_lower, " - ", f_upper)
+		#     Plots.vspan!(p4, [f_lower, f_upper],
+		# 				 color=:grey, alpha=0.3,
+		# 				 label="")
+		# end
+		
 		Plots.hline!(p4, [exp_params.S_eta.val], label=L"$S_\epsilon$", linewidth=2, color=:black, linestyle=:dash)
-		Plots.xlims!(p4, 0, f_bw/2 * 1e-6)
-		Plots.ylims!(p4, exp_params.S_eta.val/10, 1e-5)
+		Plots.xlims!(p4, ff_phase[2], f_bw/2)
+		Plots.ylims!(p4, exp_params.S_eta.val/10, maximum(S_pse))
+		p4
 	end
 end
 
@@ -484,15 +409,10 @@ end
 # ╟─8dd41f4c-ad49-42ca-b5d0-d7e2b5e7f741
 # ╟─d09ffcda-1c5e-11f0-2a95-13c00027ecfa
 # ╟─5107465f-5c73-41dd-af15-df87dc0b3d76
-# ╟─df222550-e9ca-4bc0-bb01-67b6079c16ef
-# ╟─a09fa9b8-8350-4951-a133-e50f7182db79
+# ╟─e2bed533-d289-44da-b9bb-f44cc2fde683
 # ╟─5c394cd1-c50f-4048-ac08-c6d0e90b1851
 # ╟─8da77ef1-ba12-4883-9f25-88fad120772a
 # ╟─487db32b-66d7-4951-8f7f-506c63f83481
-# ╟─369fa5fe-f2c1-4676-ab68-c3f6a8292656
-# ╟─2b4666d8-16cb-46d0-bd48-89450f3e70ba
-# ╟─f38ee192-b872-40b2-90d4-b3eef9c2ce15
-# ╟─646204c0-4bde-4f69-bfa9-3c481e03fb76
 # ╟─d9bb7605-acde-4fb9-8a46-d94980be5e88
 # ╟─d70695fc-1c04-4473-8f48-176b4ee1a10a
 # ╟─db246e44-7544-40f5-8dae-fbbdc81b5d52
@@ -502,3 +422,4 @@ end
 # ╟─19b982ce-28ee-48c5-b45e-c962d3fc89f7
 # ╟─b9564291-4cdb-456b-88db-4f70ec8f864f
 # ╟─42e826fc-dcb0-4057-9208-68009a818408
+# ╟─0d9e7ab1-fdee-4293-90b4-a8bff74f48be
