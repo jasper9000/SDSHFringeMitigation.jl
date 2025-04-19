@@ -21,6 +21,7 @@ begin
 	# push!(LOAD_PATH, dirname(pwd()));
 	import Pkg
 	Pkg.activate(".")
+	Pkg.resolve()
 end
 
 # ╔═╡ 788fdd18-cf33-40f5-8845-9a35bed9c34d
@@ -75,13 +76,6 @@ HTML("""
 	</script>
 </div>
 """)
-
-# ╔═╡ a6eee18b-7672-4154-88c8-fddb2dc5b6cf
-# PlutoUIExtra.Sidebar(
-# 	"abc "^10,
-# 	md"---",
-# 	(@bind a Slider(1:10)),
-# )
 
 # ╔═╡ 5107465f-5c73-41dd-af15-df87dc0b3d76
 md"""
@@ -196,9 +190,6 @@ The checkmark resets if phase noise parameters are changed, to save on computati
 GO! $(@bind run_all CheckBox(default=false))
 
 """
-
-# ╔═╡ 81ccb6d3-6608-49d1-a554-04a11a7839b0
-
 
 # ╔═╡ 2b4666d8-16cb-46d0-bd48-89450f3e70ba
 begin
@@ -500,28 +491,26 @@ end
 # ╠═d09ffcda-1c5e-11f0-2a95-13c00027ecfa
 # ╠═c27eafaf-cb46-4e90-9492-945221ebcca7
 # ╠═89282ccd-b3c4-4587-af1f-96b6582b820a
-# ╠═111f1904-5d2d-41ea-ad40-8a1b85dcf37b
-# ╠═a6eee18b-7672-4154-88c8-fddb2dc5b6cf
+# ╟─111f1904-5d2d-41ea-ad40-8a1b85dcf37b
 # ╟─5107465f-5c73-41dd-af15-df87dc0b3d76
 # ╟─df222550-e9ca-4bc0-bb01-67b6079c16ef
 # ╟─a09fa9b8-8350-4951-a133-e50f7182db79
 # ╟─5c394cd1-c50f-4048-ac08-c6d0e90b1851
-# ╠═8da77ef1-ba12-4883-9f25-88fad120772a
-# ╠═487db32b-66d7-4951-8f7f-506c63f83481
-# ╠═369fa5fe-f2c1-4676-ab68-c3f6a8292656
-# ╠═81ccb6d3-6608-49d1-a554-04a11a7839b0
-# ╠═2b4666d8-16cb-46d0-bd48-89450f3e70ba
+# ╟─8da77ef1-ba12-4883-9f25-88fad120772a
+# ╟─487db32b-66d7-4951-8f7f-506c63f83481
+# ╟─369fa5fe-f2c1-4676-ab68-c3f6a8292656
+# ╟─2b4666d8-16cb-46d0-bd48-89450f3e70ba
 # ╟─646204c0-4bde-4f69-bfa9-3c481e03fb76
 # ╠═465e237d-a655-4f7d-85db-63edda1efacb
-# ╠═d9bb7605-acde-4fb9-8a46-d94980be5e88
+# ╟─d9bb7605-acde-4fb9-8a46-d94980be5e88
 # ╠═40368e5d-3b1c-4cb1-b683-2772973b4640
-# ╠═fab954c6-57fc-4057-a2cf-20acf188c053
-# ╠═f78e8896-beaa-437a-9dce-8a89bf364a48
-# ╠═db246e44-7544-40f5-8dae-fbbdc81b5d52
+# ╟─fab954c6-57fc-4057-a2cf-20acf188c053
+# ╟─f78e8896-beaa-437a-9dce-8a89bf364a48
+# ╟─db246e44-7544-40f5-8dae-fbbdc81b5d52
 # ╠═f5307a34-b25a-4f3a-9602-87d2f12f77cf
 # ╠═9d4021ad-1b4d-4330-a687-f1bd3d6f9575
 # ╠═5042b6d4-483b-4e17-ae3f-d1ee204f3ebd
-# ╠═99c2143f-5790-4f6c-9682-ef4698990002
-# ╠═15f6b77b-6eea-45de-bb5d-44aed57fa132
-# ╠═19b982ce-28ee-48c5-b45e-c962d3fc89f7
-# ╠═42e826fc-dcb0-4057-9208-68009a818408
+# ╟─99c2143f-5790-4f6c-9682-ef4698990002
+# ╟─15f6b77b-6eea-45de-bb5d-44aed57fa132
+# ╟─19b982ce-28ee-48c5-b45e-c962d3fc89f7
+# ╟─42e826fc-dcb0-4057-9208-68009a818408
