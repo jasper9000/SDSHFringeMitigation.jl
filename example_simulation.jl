@@ -16,26 +16,25 @@ macro bind(def, element)
     #! format: on
 end
 
-# ╔═╡ 8dd41f4c-ad49-42ca-b5d0-d7e2b5e7f741
-using Suppressor; println("Installing required packages. This may take a few minutes...")
-
 # ╔═╡ d09ffcda-1c5e-11f0-2a95-13c00027ecfa
+# ╠═╡ show_logs = false
 begin
 	# use the local environment and force the correct downloads
 	import Pkg
-	@suppress Pkg.activate(".")
-	@suppress Pkg.resolve()
+	Pkg.activate(".")
+	Pkg.resolve()
 	# include("src/SDSHFringeMitigation.jl");
-	@suppress import SDSHFringeMitigation; const SFM = SDSHFringeMitigation;
+	using Suppressor
+	import SDSHFringeMitigation; const SFM = SDSHFringeMitigation;
 	
 	# plotting
 	import Plots
 	Plots.default(dpi=300)
-	@suppress Plots.pythonplot()
+	Plots.pythonplot()
 
 	# general use imports
 	using LaTeXStrings, ColorSchemes, PlutoUI
-	using PartialFunctions, Statistics, LinearAlgebra, DSP
+	using PartialFunctions, Statistics, LinearAlgebra, DSP, FLoops
 end;
 
 # ╔═╡ 0742953a-7f12-4a94-a42a-9433544bcfc1
@@ -63,8 +62,8 @@ HTML("""
 </div>
 """)
 
-# ╔═╡ c27eafaf-cb46-4e90-9492-945221ebcca7
-# @suppress import SDSHFringeMitigation; const SFM = SDSHFringeMitigation;
+# ╔═╡ 8dd41f4c-ad49-42ca-b5d0-d7e2b5e7f741
+println("Installing required packages. This may take a few minutes...")
 
 # ╔═╡ 5107465f-5c73-41dd-af15-df87dc0b3d76
 md"""
@@ -351,7 +350,7 @@ end;
 # ╔═╡ 15f6b77b-6eea-45de-bb5d-44aed57fa132
 begin
 	if run_all
-		using FLoops
+		# using FLoops
 		
 		lambdas = T.(10.0 .^ range(-5.0, 0.0, length=n_krr_grid))
 		if xlog
@@ -411,6 +410,7 @@ md"""
 """
 
 # ╔═╡ 19b982ce-28ee-48c5-b45e-c962d3fc89f7
+# ╠═╡ show_logs = false
 @suppress begin
 	if run_all
 		Plots.pythonplot()
@@ -481,9 +481,8 @@ end
 
 # ╔═╡ Cell order:
 # ╟─0742953a-7f12-4a94-a42a-9433544bcfc1
-# ╠═8dd41f4c-ad49-42ca-b5d0-d7e2b5e7f741
-# ╠═d09ffcda-1c5e-11f0-2a95-13c00027ecfa
-# ╠═c27eafaf-cb46-4e90-9492-945221ebcca7
+# ╟─8dd41f4c-ad49-42ca-b5d0-d7e2b5e7f741
+# ╟─d09ffcda-1c5e-11f0-2a95-13c00027ecfa
 # ╟─5107465f-5c73-41dd-af15-df87dc0b3d76
 # ╟─df222550-e9ca-4bc0-bb01-67b6079c16ef
 # ╟─a09fa9b8-8350-4951-a133-e50f7182db79
