@@ -17,10 +17,13 @@ Jasper Riebesehl, David C. Nak and Darko Zibar, "Interference Fringe Mitigation 
 
 3. Launch julia in the terminal in this directory.
 
-4. Install Pluto: 
+4. Install Pluto:
+
     `julia> import Pkg; Pkg.add("Pluto")`
 
-5. Launch the notebook of choice using Pluto:
+6. Launch the notebook of choice using Pluto:
+   
     `julia> using Pluto`
-    `julia> Pluto.run(notebook="example_simulation.jl")`
+
+    `julia> Pluto.run(notebook="examples/example_simulation.jl")`
 
